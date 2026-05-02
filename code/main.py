@@ -1,12 +1,9 @@
 import pandas as pd
 from tqdm import tqdm
 from agent import Agent
-from config import INPUT_CSV, OUTPUT_CSV, OPENAI_API_KEY
+from config import INPUT_CSV, OUTPUT_CSV
 
 def main():
-    if not OPENAI_API_KEY:
-        print("ERROR: OPENAI_API_KEY is not set in .env")
-        return
         
     print(f"Loading support tickets from {INPUT_CSV}...")
     try:
@@ -25,31 +22,27 @@ def main():
     
     print("Processing tickets...")
     for idx, row in tqdm(df.iterrows(), total=len(df)):
-        # Handle potential NaNs
-        issue = str(row['issue']) if pd.notna(row.get('issue')) else ""
-        subject = str(row['subject']) if pd.notna(row.get('subject')) else ""
-        company = str(row['company']) if pd.notna(row.get('company')) else "None"
+        # Handle potential NaNs by checking the capitalized CSV column names
+        issue = str(row['Issue']) if pd.notna(row.get('Issue')) else ""
+        subject = str(row['Subject']) if pd.notna(row.get('Subject')) else ""
+        company = str(row['Company']) if pd.notna(row.get('Company')) else "None"
         
         result_dict = agent.process_ticket(issue, subject, company)
         
-        # Combine input and output
+        # Combine input and output in the exactly requested column order
         combined = {
             "issue": issue,
             "subject": subject,
             "company": company,
-            "status": result_dict["status"],
-            "product_area": result_dict["product_area"],
-            "response": result_dict["response"],
-            "justification": result_dict["justification"],
-            "request_type": result_dict["request_type"],
+            "response": result_dict.get("response", ""),
+            "product_area": result_dict.get("product_area", "unknown"),
+            "status": result_dict.get("status", "escalated"),
+            "request_type": result_dict.get("request_type", "invalid"),
+            "justification": result_dict.get("justification", ""),
         }
         results.append(combined)
         
     output_df = pd.DataFrame(results)
-    
-    # Ensure only the 5 required columns are outputted (or all 8 if we want, but evaluation criteria specifically says: 
-    # "We score per row across all five output columns". It's safer to output the 5 columns exactly, or 8, let's output 5 + inputs to be safe)
-    # The problem statement says "For each row, generate: status, product_area, response, justification, request_type"
     
     print(f"Saving results to {OUTPUT_CSV}...")
     output_df.to_csv(OUTPUT_CSV, index=False)

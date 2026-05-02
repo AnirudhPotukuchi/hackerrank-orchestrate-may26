@@ -1,4 +1,4 @@
-openai
+ollama
 chromadb
 python-dotenv
 pandas

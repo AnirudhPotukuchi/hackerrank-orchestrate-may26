@@ -1,7 +1,7 @@
 import json
 from pydantic import BaseModel, Field
-from openai import OpenAI
-from config import OPENAI_API_KEY, CHAT_MODEL
+import ollama
+from config import CHAT_MODEL
 from retriever import Retriever
 from typing import Literal
 
@@ -15,13 +15,9 @@ class TicketResponse(BaseModel):
 
 class Agent:
     def __init__(self):
-        self.client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
         self.retriever = Retriever()
         
     def process_ticket(self, issue: str, subject: str, company: str) -> dict:
-        if not self.client:
-            raise ValueError("OPENAI_API_KEY is not set.")
-            
         # 1. Retrieve Context
         query = f"Subject: {subject}\nIssue: {issue}"
         context = self.retriever.retrieve(query=query, company=company, top_k=3)
@@ -49,23 +45,24 @@ Issue: {issue}
 
 Generate the response following the exact JSON schema."""
 
-        # 3. Call OpenAI with Structured Output
+        # 3. Call Ollama with Structured Output
         try:
-            completion = self.client.beta.chat.completions.parse(
+            response = ollama.chat(
                 model=CHAT_MODEL,
                 messages=[
                     {"role": "system", "content": system_prompt.format(context=context)},
                     {"role": "user", "content": user_prompt}
                 ],
-                response_format=TicketResponse,
-                temperature=0.0
+                format=TicketResponse.model_json_schema(),
+                options={"temperature": 0.0}
             )
             
-            result = completion.choices[0].message.parsed
-            return result.model_dump()
+            # The response text will be a valid JSON string matching the schema
+            result_dict = json.loads(response['message']['content'])
+            return result_dict
             
         except Exception as e:
-            print(f"Error calling OpenAI: {e}")
+            print(f"Error calling Ollama: {e}")
             # Return a fallback escalated response
             return {
                 "status": "escalated",

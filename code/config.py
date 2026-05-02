@@ -5,8 +5,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Verify API key
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# No API key needed for local Ollama
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,5 +20,5 @@ SAMPLE_CSV = TICKETS_DIR / "sample_support_tickets.csv"
 CHROMA_DB_DIR = BASE_DIR / "code" / "chroma_db"
 
 # LLM Configuration
-EMBEDDING_MODEL = "text-embedding-3-small"
-CHAT_MODEL = "gpt-4o"  # Fast, highly capable of structured output
+# We use local llama3.2:1b via Ollama for fast, local inference with JSON structured output
+CHAT_MODEL = "llama3.2:1b"

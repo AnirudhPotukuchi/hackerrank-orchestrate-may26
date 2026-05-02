@@ -1,31 +1,25 @@
 import os
 from pathlib import Path
 import chromadb
-from chromadb.utils import embedding_functions
-from config import DATA_DIR, CHROMA_DB_DIR, OPENAI_API_KEY, EMBEDDING_MODEL
+import chromadb.utils.embedding_functions as embedding_functions
+from config import DATA_DIR, CHROMA_DB_DIR
 
 class Retriever:
     def __init__(self):
         self.chroma_client = chromadb.PersistentClient(path=str(CHROMA_DB_DIR))
         
-        # We use OpenAI embeddings
-        self.embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
-            api_key=OPENAI_API_KEY,
-            model_name=EMBEDDING_MODEL
-        ) if OPENAI_API_KEY else None
+        # Use default local embeddings because the Gemini API quota is exhausted
+        default_ef = embedding_functions.DefaultEmbeddingFunction()
         
         # Create or get collections for each company
         self.collections = {
-            "hackerrank": self.chroma_client.get_or_create_collection("hackerrank", embedding_function=self.embedding_fn),
-            "claude": self.chroma_client.get_or_create_collection("claude", embedding_function=self.embedding_fn),
-            "visa": self.chroma_client.get_or_create_collection("visa", embedding_function=self.embedding_fn),
+            "hackerrank": self.chroma_client.get_or_create_collection("hackerrank", embedding_function=default_ef),
+            "claude": self.chroma_client.get_or_create_collection("claude", embedding_function=default_ef),
+            "visa": self.chroma_client.get_or_create_collection("visa", embedding_function=default_ef),
         }
 
     def ingest_data(self):
-        """Reads all markdown files from data/ and ingests them into ChromaDB."""
-        if not self.embedding_fn:
-            raise ValueError("OPENAI_API_KEY is not set. Cannot initialize embeddings.")
-            
+        """Reads all markdown files from data/ and ingests them into ChromaDB using local embeddings."""
         for company in self.collections.keys():
             company_dir = DATA_DIR / company
             if not company_dir.exists():
@@ -34,7 +28,7 @@ class Retriever:
             
             collection = self.collections[company]
             
-            # Check if already ingested to save time/money
+            # Check if already ingested to save time
             if collection.count() > 0:
                 print(f"Collection '{company}' already has {collection.count()} documents. Skipping ingestion.")
                 continue
@@ -57,7 +51,10 @@ class Retriever:
                     for idx, chunk in enumerate(chunks):
                         documents.append(chunk)
                         metadatas.append({"source": str(md_file.relative_to(DATA_DIR)), "company": company})
-                        ids.append(f"{md_file.stem}_{idx}")
+                        
+                        # Generate a safe, unique ID using the relative path
+                        safe_path = str(md_file.relative_to(company_dir)).replace("\\", "_").replace("/", "_").replace(".", "_")
+                        ids.append(f"{safe_path}_{idx}")
                 except Exception as e:
                     print(f"Error reading {md_file}: {e}")
             
@@ -65,7 +62,7 @@ class Retriever:
                 print(f"No documents found for {company}.")
                 continue
                 
-            # Add to collection in batches to avoid API limits
+            # Add to collection in batches
             batch_size = 100
             for i in range(0, len(documents), batch_size):
                 collection.add(
@@ -77,9 +74,6 @@ class Retriever:
 
     def retrieve(self, query: str, company: str = "None", top_k: int = 3) -> str:
         """Retrieves top_k relevant chunks. Searches specific company or all if None."""
-        if not self.embedding_fn:
-            raise ValueError("OPENAI_API_KEY is not set.")
-            
         results = []
         
         # Determine which collections to search
@@ -100,14 +94,8 @@ class Retriever:
                 for doc, meta in zip(res["documents"][0], res["metadatas"][0]):
                     results.append(f"--- Document from {meta['source']} ---\n{doc}\n")
                 
-        # If searching across multiple, we return more chunks, let's limit the total text slightly
-        # Or just return them all and let the LLM handle it
         return "\n".join(results[:top_k * len(companies_to_search)])
 
 if __name__ == "__main__":
-    # Test ingestion
-    if OPENAI_API_KEY:
-        retriever = Retriever()
-        retriever.ingest_data()
-    else:
-        print("Set OPENAI_API_KEY in .env to test ingestion.")
+    retriever = Retriever()
+    retriever.ingest_data()
