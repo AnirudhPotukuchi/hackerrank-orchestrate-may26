@@ -1,134 +1,93 @@
-# HackerRank Orchestrate
+# HackerRank Orchestrate: AI Support Triage Agent
 
-Starter repository for the **HackerRank Orchestrate** 24-hour hackathon (May 1–2, 2026).
+This repository contains my solution for the **HackerRank Orchestrate** 24-hour hackathon. 
+I built a fully local, terminal-based AI agent that triages real support tickets across three product ecosystems: **HackerRank**, **Claude**, and **Visa**.
 
-Build a terminal-based AI agent that triages real support tickets across three product ecosystems; **HackerRank**, **Claude**, and **Visa** — using only the support corpus shipped in this repo.
+## Approach & Architecture Overview
 
-Read [`problem_statement.md`](./problem_statement.md) for the full task spec, input/output schema, and allowed values, and [`evalutation_criteria.md`](./evalutation_criteria.md) for how submissions are scored.
+My solution prioritizes **100% local execution, zero-cost scaling, and privacy-first data handling**. By moving away from rate-limited cloud APIs (like Google Gemini or OpenAI) to a local model via Ollama, I completely eliminated `429 Resource Exhausted` errors and ensured uninterrupted, high-speed batch processing for the support tickets.
+
+### Core Components
+1. **Inference Engine (`Ollama` + `llama3.2:1b`)**: I use the `llama3.2:1b` model running locally via Ollama. It provides fast, cost-free generation and enforces strict Pydantic JSON schema constraints natively.
+2. **Retrieval-Augmented Generation (RAG) (`ChromaDB`)**: I process the provided markdown corpus into a persistent local ChromaDB instance. The system uses local embeddings (`all-MiniLM-L6-v2`) to accurately retrieve the most relevant documentation based on the user's issue.
+3. **Orchestrator (`Pandas`)**: A central `main.py` script orchestrates the pipeline, reading the input CSV, routing tickets through the vector database and the LLM, and constructing the finalized `output.csv` matching the strict schema constraints.
+
+### Escalation Logic
+The agent uses a direct and balanced system prompt to prevent over-escalation and hallucinations. It accurately classifies a ticket as `escalated` if:
+* The user asks for a refund, account deletion, or deals with PII/Security.
+* The user is hostile or angry.
+* The exact answer is **not** present in the retrieved ChromaDB context.
+
+Otherwise, it routes the ticket as `replied` and generates a safe, grounded response based exclusively on the retrieved documentation.
 
 ---
 
-## Contents
+## Setup Instructions
 
-1. [Repository layout](#repository-layout)
-2. [What you need to build](#what-you-need-to-build)
-3. [Where your code goes](#where-your-code-goes)
-4. [Quickstart](#quickstart)
-5. [Chat transcript logging](#chat-transcript-logging)
-6. [Submission](#submission)
-7. [Judge interview](#judge-interview)
-8. [Evaluation criteria](#evaluation-criteria)
+### Prerequisites
+1. **Python 3.10+** (Developed and tested on Python 3.13)
+2. **Ollama**: You must have [Ollama](https://ollama.com/) installed on your machine.
 
----
-
-## Repository layout
-
+### 1. Start the Local Model
+Before running the agent, you must pull and start the `llama3.2:1b` model:
+```bash
+ollama run llama3.2:1b
 ```
+Keep this running or ensure the Ollama background service is active.
+
+### 2. Install Dependencies
+Navigate to the project root and install the required Python packages:
+```bash
+pip install -r code/requirements.txt
+```
+
+---
+
+## Running the Agent
+
+To execute the triage pipeline:
+```bash
+python code/main.py
+```
+
+**What happens during execution?**
+1. **Data Ingestion**: If the `code/chroma_db` directory doesn't exist, `retriever.py` will read the entire `data/` folder, chunk the markdown, and ingest it into the local Chroma vector database.
+2. **Ticket Processing**: It will iterate over all tickets in `support_tickets/support_tickets.csv`.
+3. **Export**: It saves the structured results into `support_tickets/output.csv` strictly matching the required column order.
+
+*(Note: Ensure `output.csv` is CLOSED in your text editor/Excel before running, or Windows will throw a `PermissionError`!)*
+
+---
+
+## Repository Structure
+
+```text
 .
 ├── AGENTS.md                       # Rules for AI coding tools + transcript logging
 ├── problem_statement.md            # Full task description and I/O schema
-├── README.md                       # You are here
-├── code/                           # ← Build your agent here
-│   └── main.py                     #   Entry point (rename/extend as you like)
-├── data/                           # Local-only support corpus (no network needed)
-│   ├── hackerrank/                 #   HackerRank help center
-│   ├── claude/                     #   Claude Help Center export
-│   └── visa/                       #   Visa consumer + small-business support
+├── README.md                       # Setup and Approach Documentation (You are here)
+├── log.txt                         # AI Assistant Chat Transcript for submission
+├── code/                           # Core Agent Logic
+│   ├── main.py                     # Entry point and data orchestrator
+│   ├── agent.py                    # LLM Prompting and Structured Output logic
+│   ├── retriever.py                # ChromaDB RAG and local embedding pipeline
+│   ├── config.py                   # Global configuration and paths
+│   ├── requirements.txt            # Python dependencies
+│   └── chroma_db/                  # (Generated) Persistent Vector DB storage
+├── data/                           # Local-only support corpus
 └── support_tickets/
     ├── sample_support_tickets.csv  # Inputs + expected outputs (for development)
-    ├── support_tickets.csv         # Inputs only (run your agent on these)
-    └── output.csv                  # Write your agent's predictions here
+    ├── support_tickets.csv         # Target inputs 
+    └── output.csv                  # The finalized, agent-generated outputs
 ```
 
 ---
 
-## What you need to build
+## Hackathon Submission Details
 
-A terminal-based agent that, for each row in `support_tickets/support_tickets.csv`, produces:
+If you are evaluating this submission:
+1. **Code**: Found entirely in the `code/` directory.
+2. **Predictions CSV**: The `support_tickets/output.csv` has been successfully generated and formatted.
+3. **Chat Transcript**: The chat logs with the AI assistant have been accurately maintained in the local `log.txt` file (as well as the global path specified in `AGENTS.md`).
 
-| Column         | Allowed values                                          |
-| -------------- | ------------------------------------------------------- |
-| `status`       | `replied`, `escalated`                                  |
-| `product_area` | most relevant support category / domain area            |
-| `response`     | user-facing answer grounded in the provided corpus      |
-| `justification`| concise explanation of the routing/answering decision   |
-| `request_type` | `product_issue`, `feature_request`, `bug`, `invalid`    |
-
-Hard requirements (from `problem_statement.md`):
-
-- Must be **terminal-based**.
-- Must use **only the provided support corpus** (no live web calls for ground-truth answers).
-- Must **escalate** high-risk, sensitive, or unsupported cases instead of guessing.
-- Must avoid hallucinated policies or unsupported claims.
-
-Beyond that you are free to bring your own approach — RAG, vector DBs, tool use, structured output, agent frameworks, classical ML, or anything else.
-
----
-
-## Where your code goes
-
-All of your work belongs in [`code/`](./code/). The repo ships with an empty `code/main.py` you can grow into your full agent — add more modules (`agent.py`, `retriever.py`, `classifier.py`, etc.) next to it as needed.
-
-Conventions:
-
-- Put a **README inside `code/`** describing how to install dependencies and run your agent.
-- Read secrets **from environment variables only** (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, …). Copy `.env.example` → `.env` (already gitignored) if you keep one. **Never hardcode keys.**
-- Be **deterministic** where possible. Seed any random sampling.
-- Write responses to `support_tickets/output.csv`.
-
----
-
-## Quickstart
-
-Clone this repository:
-
-```bash
-git clone git@github.com:interviewstreet/hackerrank-orchestrate-may26.git
-cd hackerrank-orchestrate-may26
-```
-
-You are free to use any language or runtime. We recommend **Python**, **JavaScript**, or **TypeScript**.
-
----
-
-## Chat transcript logging
-
-This repo ships with an `AGENTS.md` that any modern AI coding tool (Cursor, Claude Code, Codex, Gemini CLI, Copilot, etc.) will read. It instructs the tool to append every conversation turn to a single shared log file:
-
-| Platform       | Path                                              |
-| -------------- | ------------------------------------------------- |
-| macOS / Linux  | `$HOME/hackerrank_orchestrate/log.txt`            |
-| Windows        | `%USERPROFILE%\hackerrank_orchestrate\log.txt`    |
-
-You don't need to do anything to enable it — just use your AI tool normally. You'll upload this `log.txt` as your chat transcript at submission time.
-
----
-
-## Submission
-
-Submit on the HackerRank Community Platform:
-<https://www.hackerrank.com/contests/hackerrank-orchestrate-may26/challenges/support-agent/submission>
-
-You will upload **three** files:
-
-1. **Code zip** — zip your `code/` directory and upload it. Exclude virtualenvs, `node_modules`, build artifacts, the `data/` corpus, and the `support_tickets/` CSVs.
-2. **Predictions CSV** — your agent's output for `support_tickets/support_tickets.csv` (i.e. the populated `output.csv`).
-3. **Chat transcript** — the `log.txt` from the path in [Chat transcript logging](#chat-transcript-logging).
-
----
-
-## Judge interview
-
-After a successful submission, your AI Judge interview will happen within a few hours after the hackathon ends. It will stay open for the next 4 hours. 
-
-The AI Judge will have access to your submission and may ask about your approach, decisions, and how you used AI while building your solution. The interview will be 30 minutes long, and keeping your camera on is mandatory.
-
-Results will be announced on May 15, 2026
-
----
-
-## Evaluation criteria
-
-Submissions are scored across four dimensions: agent design (your `code/`), the AI Judge interview, output accuracy on `support_tickets/output.csv`, and AI fluency from your chat transcript.
-
-See [`evalutation_criteria.md`](./evalutation_criteria.md) for the full rubric.
+For detailed rubric information, see [`evalutation_criteria.md`](./evalutation_criteria.md).

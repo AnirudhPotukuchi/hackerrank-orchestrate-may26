@@ -23,18 +23,14 @@ class Agent:
         context = self.retriever.retrieve(query=query, company=company, top_k=3)
         
         # 2. Construct Prompt
-        system_prompt = """You are a terminal-based support triage agent handling tickets for HackerRank, Claude, and Visa.
-        
-You MUST use ONLY the provided context corpus to understand the issue, decide whether it can be answered safely, and determine when it should be escalated. Do NOT use outside knowledge.
+        system_prompt = """You are an AI Support Agent. Classify the ticket status strictly as either 'replied' or 'escalated'.
 
-RULES:
-- assess urgency and risk. If high-risk, sensitive, or unsupported, escalate.
-- identify the request type and product area.
-- generate a safe, grounded response if replying.
-- if escalating, the response should be brief (e.g., stating the issue is being escalated to a human).
-- NO hallucinated policies or steps.
+CRITICAL INSTRUCTIONS:
+1. ONLY set status to 'escalated' if the user asks for a refund, account deletion, mentions security/PII, is angry, OR if the provided context DOES NOT contain the answer.
+2. If the context DOES contain the answer and it is a normal question, you MUST set status to 'replied'.
+3. The 'response' and 'justification' fields MUST be simple PLAIN TEXT strings. Do NOT output nested JSON objects inside them.
 
-Context Corpus:
+Context Documents:
 {context}
 """
         
@@ -43,7 +39,7 @@ Company: {company}
 Subject: {subject}
 Issue: {issue}
 
-Generate the response following the exact JSON schema."""
+Respond strictly with a single valid JSON object matching the schema."""
 
         # 3. Call Ollama with Structured Output
         try:
