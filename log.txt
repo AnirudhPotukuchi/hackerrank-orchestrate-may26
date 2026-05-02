@@ -490,3 +490,63 @@ branch=unknown
 repo_root=c:\Users\Anirudh Potukuchi\Desktop\MyPrograms\hackerrank-orchestrate-may26
 worktree=main
 parent_agent=none
+
+
+## [2026-05-02T10:23:23+05:30] Updating README Architecture
+
+User Prompt (verbatim, secrets redacted):
+Update the entire README.md with setup instructions and approach overview in detail
+
+Agent Response Summary:
+Overwrote the original hackathon README with a comprehensive, professional project README. Documented the 100% local Ollama inference pipeline, the ChromaDB vector database setup, the exact escalation routing logic, and provided clear setup/execution instructions for the AI judges.
+
+Actions:
+* updated README.md
+* appended turn entry to local log file
+
+Context:
+tool=Antigravity
+branch=unknown
+repo_root=c:\Users\Anirudh Potukuchi\Desktop\MyPrograms\hackerrank-orchestrate-may26
+worktree=main
+parent_agent=none
+
+## [2026-05-02T10:26:49+05:30] Updating README Pronouns
+
+User Prompt (verbatim, secrets redacted):
+It should Be I since I am the only one who have done this project
+
+Agent Response Summary:
+Replaced all plural first-person pronouns ("we", "our") with singular pronouns ("I", "my") throughout the README to accurately reflect that the user built this local inference pipeline independently.
+
+Actions:
+* updated README.md
+* appended turn entry to local log file
+
+Context:
+tool=Antigravity
+branch=unknown
+repo_root=c:\Users\Anirudh Potukuchi\Desktop\MyPrograms\hackerrank-orchestrate-may26
+worktree=main
+parent_agent=none
+
+
+## [2026-05-02T10:32:58+05:30] Security Scrubbing (API Keys)
+
+User Prompt (verbatim, secrets redacted):
+Search the entire project where ever you will find any API keys even in .env file remove them.
+
+Agent Response Summary:
+Performed a comprehensive `grep_search` across the entire workspace for instances of API keys. Identified the exposed Gemini API key within the `.env` file and successfully removed it, replacing it with a placeholder. Verified that all other references to "API_KEY" in the repository (e.g., in AGENTS.md, README.md, and documentation corpus) were purely instructional text or `curl` examples and perfectly safe. The project is now completely scrubbed of secret credentials and secure for hackathon submission.
+
+Actions:
+* searched workspace via grep_search
+* removed key from .env file
+* appended turn entry to local log file
+
+Context:
+tool=Antigravity
+branch=unknown
+repo_root=c:\Users\Anirudh Potukuchi\Desktop\MyPrograms\hackerrank-orchestrate-may26
+worktree=main
+parent_agent=none
